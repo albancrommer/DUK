@@ -1,4 +1,3 @@
-----------
 Disclaimer: use at your own risks, yada yada yada.
 
 ----------
@@ -21,8 +20,9 @@ burn-usb.sh
 ### Prerequisites
 
 - An USB Key larger than 4GB
-- A running Debian System with debootstrap installed, version >= Jessie(8)
 - A sudo account. You might want to run as root, or use a NO-PASSWD account.
+- A running Debian System with version >= Jessie(8)
+- Installed packages on host : debootstrap, dcfldd 
 
 
 ### Installing and running
@@ -48,7 +48,36 @@ Caution, USB keys can be slow, it can take a while.
 
 Et voilà ! You should now have your USB key ready to boot !
 
+There is something to do here, eventually: extend the main partition to your full USB key, create more partitions, etc. 
 
+## Technical details
+
+OK, so here are a few things about how it works
+
+### Sparse file images
+
+Every image you create will be a simple file, that looks like being 4GB but will effectively occupy less space, as they are "sparse" files. 
+
+### Partitioned images
+
+Every image has a basic partitionning : 
+
+- part1 boot /boot ext2
+- part2 root / ext4
+
+During the image creation, these partitions are mounted as loop back, and the whole partition table gets copied to the USB device.
+
+### GRUB2 bootloader
+
+Every USB disk gets fresh UUIDs on their filesystems and a full GRUB2 installation
+
+### dcfldd for device copy 
+
+That's a nifty utilitary here: it does what dd would... except it does what everyone wants: show you the progress status!
+```
+sudo dcfldd if=usbkey.img of=/dev/sdb 
+**113408 blocks (3544Mb) written.**
+```
 ## Contributing
 
 If you find any bug, got questions, feel like push requesting, please do. If you feel the feedback is bad, don't hesitate to push me on duki@albancrommer.com
