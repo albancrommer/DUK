@@ -27,7 +27,7 @@ burn-usb.sh
 
 ### Installing and running
 
-**Fist, copy the code on your computer **
+**Fist, copy the code on your computer**
 
 ```
 git clone https://github.com/albancrommer/DUK
