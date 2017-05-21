@@ -6,7 +6,7 @@ Disclaimer: use at your own risks, yada yada yada.
 
 # What is DUKI? 
 
-Need a Debian USB key that runs everywhere and keeps packages or files remain over reboots?  It's **exactly** what this project is all about! Lucky you! 
+Need a Debian USB key that runs everywhere and keeps packages or files over reboots? Damn, it's **exactly** what this is all about! Lucky you! 
 
 
 ## Getting Started
