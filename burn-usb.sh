@@ -7,6 +7,9 @@ CHROOT="/mnt"
 APP_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd "$APP_PATH"
 
+# It should require dcfldd on host
+sudo apt-get install dcfldd
+
 # It should search for non mounted disks / devices
 declare -a DEVICE_LIST
 for device in $( ls /dev/sd? ); do 
@@ -70,25 +73,7 @@ REPLY=${REPLY:-Y}
 [ "${REPLY^^}" != "Y" ] && { echo "OK, exiting."; exit 1; }
 
 # It should burn the image on the disk
-sudo dd if=${IMAGE} of=${USB_DISK} & pid=$!
-
-# It should print info on the process
-LOOPS=0
-SIZE=$(stat -c %s $IMAGE)
-echo "Total size: $SIZE bytes"
-while [ $ENDED -eq 0 ]; do
-	#
-	sudo kill -USR1 $pid; 
-	[ $? -ne 0 ] && ENDED=1 && break;
-	let $((LOOPS++))
-	if [[ $LOOPS -gt 30 && 0 -eq $(( $LOOPS %6 )) ]] ; then 
-		read -n 1 -p "It's taking a long time. Want to stop? [y/N]" REPLY
-		REPLY=${REPLY:-N}
-		[ "${REPLY^^}" != "Y" ] && { echo "OK, exiting."; exit 1; }
-	fi
-	# Sleep a bit
-	sleep 10;
-done
+sudo dcfldd if=${IMAGE} of=${USB_DISK} & pid=$!
 
 # It should find the new partitions
 sudo partprobe "$USB_DISK"

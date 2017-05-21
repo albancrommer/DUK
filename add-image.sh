@@ -73,10 +73,11 @@ sudo chroot $CHROOT dpkg-reconfigure locales
 # It should install
 sudo chroot $CHROOT aptitude -y install -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 linux-base firmware-linux-free firmware-linux-nonfree
 
-# @todo provide some optional graphical package lists
-
 # It should install packages necessary to adminsys
 sudo chroot $CHROOT aptitude -y install cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
+
+# It should run tasksel in the image
+sudo chroot $CHROOT tasksel
 
 # It should force an upgrade
 sudo chroot $CHROOT aptitude -y upgrade 
