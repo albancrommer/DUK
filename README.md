@@ -14,8 +14,8 @@ Need a Debian USB key that runs everywhere and keeps packages or files over rebo
 ```
 git clone https://github.com/albancrommer/DUKI
 cd DUKI
-add-image.sh
-burn-usb.sh
+./add-image.sh
+./burn-usb.sh
 ```
 ### Prerequisites
 
