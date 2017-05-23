@@ -8,7 +8,7 @@ APP_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd "$APP_PATH"
 
 # It should require dcfldd on host
-sudo apt-get install dcfldd
+which dcfldd &>/dev/null || sudo apt-get install dcfldd
 
 # It should search for non mounted disks / devices
 declare -a DEVICE_LIST
@@ -73,7 +73,7 @@ REPLY=${REPLY:-Y}
 [ "${REPLY^^}" != "Y" ] && { echo "OK, exiting."; exit 1; }
 
 # It should burn the image on the disk
-sudo dcfldd if=${IMAGE} of=${USB_DISK} & pid=$!
+sudo dcfldd if=${IMAGE} of=${USB_DISK} 
 
 # It should find the new partitions
 sudo partprobe "$USB_DISK"
@@ -95,8 +95,9 @@ sudo mount "$PART_ROOT" "$CHROOT"
 sudo mount "$PART_BOOT" "$CHROOT"/boot
 
 # It should set the new UUID to the fstab
-sudo bash -c "echo 'UUID=$UUID_BOOT /boot ext2 auto,noatime 0 0' > $CHROOT/etc/fstab"
-sudo bash -c "echo 'UUID=$UUID_ROOT / ext4 auto,noatime 0 0' >> $CHROOT/etc/fstab"
+sudo bash -c "echo '# <file system> <mount point>   <type>  <options>       <dump>  <pass>' > $CHROOT/etc/fstab"
+sudo bash -c "echo 'UUID=$UUID_BOOT /boot ext2 defaults 0 2' >> $CHROOT/etc/fstab"
+sudo bash -c "echo 'UUID=$UUID_ROOT / ext4 errors=remount-ro 0 1' >> $CHROOT/etc/fstab"
 
 # It should mount dev sys proc in the chroot
 for i in proc sys dev ; do sudo mount /$i "$CHROOT"/$i --bind ; done
