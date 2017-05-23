@@ -1,7 +1,14 @@
-#!/bin/bash -e
+#!/bin/bash
+
+# It should read an optional distribution name from parameters
+[ -n "$1" ] && SUITE="$1"
+
+# It should deploy a Jessie by default
+SUITE=${SUITE:-jessie}
+[ ! -f "/usr/share/debootstrap/scripts/$SUITE" ] && { echo "Invalid suite requested: $SUITE"; exit 1; }
 
 # It should require an image name
-read -p "Please give a name to your key (default is usbkey);" NAME
+read -p "Please give a name to your key (default is usbkey): " NAME
 NAME=${NAME:-usbkey}
 
 # It should set a bunch of variables
@@ -47,7 +54,7 @@ sudo tune2fs "$PART_ROOT" -U $UUID_ROOT
 sudo mount "$PART_ROOT" "$CHROOT"
 
 # It should run debootstrap
-sudo debootstrap jessie "$CHROOT"
+sudo debootstrap $SUITE "$CHROOT"
 
 # It should mount the boot partition
 sudo mount "$PART_BOOT" "$CHROOT"/boot
@@ -69,6 +76,9 @@ sudo chroot $CHROOT apt-get -y install aptitude grub2 console-setup console-setu
 
 # It should reconfigure the locales
 sudo chroot $CHROOT dpkg-reconfigure locales 
+
+# It should reconfigure the console-setup
+sudo chroot $CHROOT dpkg-reconfigure console-setup 
 
 # It should install
 sudo chroot $CHROOT aptitude -y install -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 linux-base firmware-linux-free firmware-linux-nonfree
