@@ -27,24 +27,22 @@ echo "
 # partition table of usbkey.img
 unit: sectors
 
-    usbkey.img1 : start=     2048, size=   409600, Id=83, bootable
-    usbkey.img2 : start=   411648, size=  7900000, Id=83
- "|sfdisk -f $IMAGE
+usbkey.img1 : start=     2048, size=  8388608, Id= b
+usbkey.img2 : start=  8390656, size=   409600, Id=83, bootable
+usbkey.img3 : start=  8800256, size=  7976960, Id=83
+usbkey.img4 : start=        0, size=        0, Id= 0
+"|sfdisk -f $IMAGE
 
 # It should mount the file as a loop back device
 LOOP_DEVICE=$(sudo losetup -P -f --show "$IMAGE")
-PART_BOOT="${LOOP_DEVICE}p1"
-PART_ROOT="${LOOP_DEVICE}p2"
+PART_VFAT="${LOOP_DEVICE}p1"
+PART_BOOT="${LOOP_DEVICE}p2"
+PART_ROOT="${LOOP_DEVICE}p3"
 
 # It should make file systems for 2 partitions
+sudo mkfs.vfat "${PART_FAT}"
 sudo mkfs.ext2 "${PART_BOOT}"
 sudo mkfs.ext4 "${PART_ROOT}"
-
-# It should force filesystems UUIDs
-UUID_BOOT=$(uuidgen)
-UUID_ROOT=$(uuidgen) 
-sudo tune2fs "$PART_BOOT" -U $UUID_BOOT
-sudo tune2fs "$PART_ROOT" -U $UUID_ROOT
 
 # It should create the chroot dirs if necessary
 [ ! -d "$CHROOT" ] && mkdir "$CHROOT"
@@ -61,12 +59,6 @@ sudo mount "$PART_BOOT" "$CHROOT"/boot
 
 # It should mount proc sys dev for the chroot
 for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --bind ; done
-
-# It should set default repositories
-sudo bash -c "echo 'deb http://debian.octopuce.fr/debian/ jessie main contrib non-free                                                                         
-deb http://debian.octopuce.fr/debian/ jessie-backports main contrib non-free
-deb http://debian.octopuce.fr/debian-security jessie/updates main contrib non-free
-' > ${CHROOT}/etc/apt/sources.list"
 
 # It should run an apt udate
 sudo chroot $CHROOT apt-get update

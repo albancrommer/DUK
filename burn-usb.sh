@@ -85,8 +85,9 @@ echo UUID BOOT $UUID_BOOT
 echo UUID ROOT $UUID_ROOT
 
 # It should apply new UUIDs to the newly burned devices
-PART_BOOT="${USB_DISK}1"
-PART_ROOT="${USB_DISK}2"
+PART_VFAT="${USB_DISK}1"
+PART_BOOT="${USB_DISK}2"
+PART_ROOT="${USB_DISK}3"
 sudo tune2fs "$PART_BOOT" -U $UUID_BOOT
 sudo tune2fs "$PART_ROOT" -U $UUID_ROOT
 
