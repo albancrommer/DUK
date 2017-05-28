@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# It should require sudo 
+if ! which sudo &>/dev/null ; then 
+	echo "You must install sudo."
+	exit 1
+fi
+
+# It should require debootstrap
+if ! which debootstrap &>/dev/null ; then 
+	read -n 1 -p "Debootstrap is required. Agree to install it? [Y/n]: "
+	REPLY=${REPLY:-Y}
+	[ ${REPLY^^} = "N" ] && exit
+	sudo apt-get install debootstrap
+fi
+
 # It should read an optional distribution name from parameters
 [ -n "$1" ] && SUITE="$1"
 
