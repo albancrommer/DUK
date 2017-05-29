@@ -65,7 +65,7 @@ case ${#IMAGE_LIST[@]} in
 		[ -z "$IMAGE" ] && { echo "Invalid key. Exiting."; exit 1; }
 	;;
 esac
-IMAGE="${APP_PATH}/${IMAGE_LIST[0]}"
+IMAGE="${APP_PATH}/$IMAGE"
 
 # It should print the command and validate
 read -n 1 -p "Ready to burn '$USB_DISK' with image '$IMAGE'. OK? [Y/n] " REPLY
