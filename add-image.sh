@@ -34,7 +34,7 @@ CHROOT="${APP_PATH}/usbchroot"
 [ -f "$IMAGE" ] && { echo "The image '$IMAGE' already exists. Exiting"; exit 1; }
 
 # It should make a file image sparse  ie. seen as 4G but 0 blocks used at start
-truncate -s 4G "$IMAGE"
+truncate -s 8G "$IMAGE"
 
 # It should partition the image with 2 partitions
 echo "
@@ -52,6 +52,12 @@ LOOP_DEVICE=$(sudo losetup -P -f --show "$IMAGE")
 PART_VFAT="${LOOP_DEVICE}p1"
 PART_BOOT="${LOOP_DEVICE}p2"
 PART_ROOT="${LOOP_DEVICE}p3"
+
+# It should fail if partitions not mounted
+if [ ! -e $PART_ROOT ] || [ ! -e $PART_BOOT ] ; then 
+	echo "Failed to mount the local loop partitions. Exiting."
+	exit 1
+fi
 
 # It should make file systems for 2 partitions
 sudo mkfs.vfat "${PART_FAT}"
@@ -77,20 +83,28 @@ for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --bind ; done
 # It should run an apt udate
 sudo chroot $CHROOT apt-get update
 
+# It should require non interactive installs
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+
 # It should install packages necessary to booting
-sudo chroot $CHROOT apt-get -y install aptitude grub2 console-setup console-setup-linux keyboard-configuration locales
+sudo chroot $CHROOT DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get -y install aptitude grub2  console-setup console-setup-linux keyboard-configuration locales
 
 # It should reconfigure the locales
 sudo chroot $CHROOT dpkg-reconfigure locales 
 
 # It should reconfigure the console-setup
-sudo chroot $CHROOT dpkg-reconfigure console-setup 
+sudo chroot $CHROOT dpkg-reconfigure console-data
 
-# It should install
+# It should install the right kernel 
+# @todo this is not ok with SUITE !
 sudo chroot $CHROOT aptitude -y install -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 linux-base firmware-linux-free firmware-linux-nonfree
 
 # It should install packages necessary to adminsys
 sudo chroot $CHROOT aptitude -y install cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
+
+export DEBIAN_FRONTEND=""
+export DEBCONF_NONINTERACTIVE_SEEN=false
 
 # It should run tasksel in the image
 sudo chroot $CHROOT tasksel
@@ -130,6 +144,7 @@ sudo killall mdadm openssh-server
 for i in proc sys dev ; do sudo umount "$CHROOT/$i" ; done
 sudo umount "$CHROOT"/boot
 sudo umount "$CHROOT"
+
 
 # Finish !
 echo "OK. finished. Now you can run burn-usb.sh!"
