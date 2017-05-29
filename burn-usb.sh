@@ -103,11 +103,12 @@ sudo bash -c "echo 'UUID=$UUID_ROOT / ext4 errors=remount-ro 0 1' >> $CHROOT/etc
 # It should mount dev sys proc in the chroot
 for i in proc sys dev ; do sudo mount /$i "$CHROOT"/$i --bind ; done
 
-# It should set the device map for grup
-sudo bash -c "echo '(hd0) $USB_DISK' > $CHROOT/boot/grub/device.map"
 
 # It should run update grub in the chroot
 sudo chroot $CHROOT update-grub2
+
+# It should set the device map for grup
+sudo bash -c "echo '(hd0) $USB_DISK' > $CHROOT/boot/grub/device.map"
 
 # It should install grub on the USB KEY
 sudo chroot $CHROOT grub-install "$USB_DISK"
@@ -116,4 +117,17 @@ sudo chroot $CHROOT grub-install "$USB_DISK"
 for i in proc sys dev ; do sudo umount "$CHROOT/$i" ; done
 sudo umount "$CHROOT"/boot
 sudo umount "$CHROOT"
-exit
+
+# It should resize the root partition
+sudo fdisk ${USB_DISK} <<EOF
+d
+3
+n
+p
+3
+8800256
+
+w
+EOF
+# It should resize the root fs
+sudo resize2fs -f "$PART_ROOT"

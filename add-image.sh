@@ -72,7 +72,7 @@ sudo mkfs.ext4 "${PART_ROOT}"
 sudo mount "$PART_ROOT" "$CHROOT"
 
 # It should run debootstrap
-sudo debootstrap $SUITE "$CHROOT"
+sudo debootstrap --variant=minbase $SUITE "$CHROOT"
 
 # It should mount the boot partition
 sudo mount "$PART_BOOT" "$CHROOT"/boot
@@ -84,7 +84,7 @@ for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --bind ; done
 sudo chroot $CHROOT apt-get update
 
 # It should install packages necessary to booting
-sudo chroot $CHROOT DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get -y install aptitude grub2  console-setup console-setup-linux keyboard-configuration locales
+sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin apt-get -y install aptitude grub2 tasksel console-data console-setup-linux keyboard-configuration locales
 
 # It should reconfigure the locales
 sudo chroot $CHROOT dpkg-reconfigure locales 
@@ -94,10 +94,10 @@ sudo chroot $CHROOT dpkg-reconfigure console-data
 
 # It should install the right kernel 
 # @todo this is not ok with SUITE !
-sudo chroot $CHROOT DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true aptitude -y install -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 linux-base firmware-linux-free firmware-linux-nonfree
+sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin aptitude -y install -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 linux-base firmware-linux-free firmware-linux-nonfree
 
 # It should install packages necessary to adminsys
-sudo chroot $CHROOT DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true aptitude -y install cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
+sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin aptitude -y install cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
 
 # It should run tasksel in the image
 sudo chroot $CHROOT tasksel
