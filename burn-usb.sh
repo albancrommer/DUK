@@ -107,6 +107,9 @@ for i in proc sys dev ; do sudo mount /$i "$CHROOT"/$i --bind ; done
 # It should run update grub in the chroot
 sudo chroot $CHROOT update-grub2
 
+# It should reconfigure initramfs
+sudo chroot $CHROOT dpkg-reconfigure initramfs-tools
+
 # It should set the device map for grup
 sudo bash -c "echo '(hd0) $USB_DISK' > $CHROOT/boot/grub/device.map"
 
