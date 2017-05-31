@@ -84,7 +84,7 @@ for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --bind ; done
 sudo bash -c "echo 'deb http://httpredir.debian.org/debian jessie-backports main contrib non-free' >> $CHROOT/etc/apt/sources.list"
 
 # It should install the right kernel 
-read -p "Would you like to a recent  Linux Kernel (4.9) ? [Y/n]" REPLY
+read -p "Would you like to a recent  Linux Kernel (4.9) for Jessie ? [Y/n]" REPLY
 REPLY=${REPLY:-Y}
 if [ "${REPLY^^}" != "N" ] ; then 
 		LINUX_IMAGE=" -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 "
@@ -96,26 +96,25 @@ fi
 sudo chroot $CHROOT apt-get update
 
 # It should install some basic packages 
-sudo chroot $CHROOT apt-get -y install $LINUX_IMAGE  aptitude linux-base firmware-linux-free firmware-linux-nonfree
+sudo chroot $CHROOT apt-get -y install $LINUX_IMAGE locales aptitude linux-base firmware-linux-free firmware-linux-nonfree
+
+# It should reconfigure the locales
+sudo chroot $CHROOT dpkg-reconfigure locales 
+
 
 read -p "Would you like to install system admin packages? [Y/n]" REPLY
 REPLY=${REPLY:-Y}
 if [ "${REPLY^^}" != "N" ] ; then 
 
 	# It should install packages necessary to adminsys
-	sudo chroot $CHROOT aptitude -y install console-data keyboard-configuration console-setup-linux  cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
+	sudo chroot $CHROOT apt-get -y install console-data keyboard-configuration console-setup-linux cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server smartmontools debootstrap debsums sudo 
 
-	# It should reconfigure the locales
-	sudo chroot $CHROOT dpkg-reconfigure locales 
-
-	# It should reconfigure the console-setup
-	sudo chroot $CHROOT dpkg-reconfigure console-data
-	
 	# It should allow ssh remote root access
 	sudo sed -i -r "s/^PermitRootLogin without-password/PermitRootLogin yes/" $CHROOT/etc/ssh/sshd_config
 	
 	# It should kill services starting by the chroot install
-	sudo killall mdadm openssh-server
+	pgrep mdadm &>/dev/null && sudo killall mdadm
+	pgrep sshd &>/dev/null && sudo killall sshd
 
 
 
@@ -126,7 +125,7 @@ REPLY=${REPLY:-Y}
 if [ "${REPLY^^}" != "N" ] ; then 
 
 	# It should run tasksel in the image
-	sudo chroot $CHROOT apt-get -y locales tasksel
+	sudo chroot $CHROOT apt-get -y install tasksel
 	sudo chroot $CHROOT tasksel
 
 fi
@@ -150,7 +149,7 @@ sudo bash -c "echo 'UUID=$UUID_BOOT /boot ext2 auto,noatime 0 0' > $CHROOT/etc/f
 sudo bash -c "echo 'UUID=$UUID_ROOT / ext4 auto,noatime 0 0' >> $CHROOT/etc/fstab"
 
 # It should install GRUB
-sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin apt-get -y install initramfs grub2  
+sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin apt-get -y install initramfs-tools grub-pc  
 
 # It should clean up apt
 sudo chroot "$CHROOT" apt-get clean
