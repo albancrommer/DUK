@@ -28,7 +28,7 @@ NAME=${NAME:-usbkey}
 # It should set a bunch of variables
 APP_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 IMAGE="${APP_PATH}/${NAME}.img"
-CHROOT="${APP_PATH}/usbchroot"
+CHROOT=$(mktemp -d)
 
 # It should escape if the image already exists 
 [ -f "$IMAGE" ] && { echo "The image '$IMAGE' already exists. Exiting"; exit 1; }
@@ -60,7 +60,7 @@ if [ ! -e $PART_ROOT ] || [ ! -e $PART_BOOT ] ; then
 fi
 
 # It should make file systems for 2 partitions
-sudo mkfs.vfat "${PART_FAT}"
+sudo mkfs.vfat "${PART_VFAT}"
 sudo mkfs.ext2 "${PART_BOOT}"
 sudo mkfs.ext4 "${PART_ROOT}"
 
@@ -72,7 +72,7 @@ sudo mkfs.ext4 "${PART_ROOT}"
 sudo mount "$PART_ROOT" "$CHROOT"
 
 # It should run debootstrap
-sudo debootstrap --variant=minbase $SUITE "$CHROOT"
+sudo debootstrap $SUITE "$CHROOT"
 
 # It should mount the boot partition
 sudo mount "$PART_BOOT" "$CHROOT"/boot
@@ -80,27 +80,56 @@ sudo mount "$PART_BOOT" "$CHROOT"/boot
 # It should mount proc sys dev for the chroot
 for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --bind ; done
 
+# It should force the jessie backport
+sudo bash -c "echo 'deb http://httpredir.debian.org/debian jessie-backports main contrib non-free' >> $CHROOT/etc/apt/sources.list"
+
+# It should install the right kernel 
+read -p "Would you like to a recent  Linux Kernel (4.9) ? [Y/n]" REPLY
+REPLY=${REPLY:-Y}
+if [ "${REPLY^^}" != "N" ] ; then 
+		LINUX_IMAGE=" -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 "
+else 
+	LINUX_IMAGE=" linux-image-amd64 "
+fi
+
 # It should run an apt udate
 sudo chroot $CHROOT apt-get update
 
-# It should install packages necessary to booting
-sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin apt-get -y install aptitude grub2 tasksel console-data console-setup-linux keyboard-configuration locales
+# It should install some basic packages 
+sudo chroot $CHROOT apt-get -y install $LINUX_IMAGE  aptitude linux-base firmware-linux-free firmware-linux-nonfree
 
-# It should reconfigure the locales
-sudo chroot $CHROOT dpkg-reconfigure locales 
+read -p "Would you like to install system admin packages? [Y/n]" REPLY
+REPLY=${REPLY:-Y}
+if [ "${REPLY^^}" != "N" ] ; then 
 
-# It should reconfigure the console-setup
-sudo chroot $CHROOT dpkg-reconfigure console-data
+	# It should install packages necessary to adminsys
+	sudo chroot $CHROOT aptitude -y install console-data keyboard-configuration console-setup-linux  cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
 
-# It should install the right kernel 
-# @todo this is not ok with SUITE !
-sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin aptitude -y install -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 linux-base firmware-linux-free firmware-linux-nonfree
+	# It should reconfigure the locales
+	sudo chroot $CHROOT dpkg-reconfigure locales 
 
-# It should install packages necessary to adminsys
-sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin aptitude -y install cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server install smartmontools debootstrap debsums sudo 
+	# It should reconfigure the console-setup
+	sudo chroot $CHROOT dpkg-reconfigure console-data
+	
+	# It should allow ssh remote root access
+	sudo sed -i -r "s/^PermitRootLogin without-password/PermitRootLogin yes/" $CHROOT/etc/ssh/sshd_config
+	
+	# It should kill services starting by the chroot install
+	sudo killall mdadm openssh-server
 
-# It should run tasksel in the image
-sudo chroot $CHROOT tasksel
+
+
+fi
+
+read -p "Would you like to run desktop, server, laptop package installs? [Y/n] " REPLY
+REPLY=${REPLY:-Y}
+if [ "${REPLY^^}" != "N" ] ; then 
+
+	# It should run tasksel in the image
+	sudo chroot $CHROOT apt-get -y locales tasksel
+	sudo chroot $CHROOT tasksel
+
+fi
 
 # It should force an upgrade
 sudo chroot $CHROOT aptitude -y upgrade 
@@ -120,18 +149,15 @@ sudo sed -i "2i\nameserver 8.8.8.8" "${CHROOT}/etc/resolv.conf"
 sudo bash -c "echo 'UUID=$UUID_BOOT /boot ext2 auto,noatime 0 0' > $CHROOT/etc/fstab"
 sudo bash -c "echo 'UUID=$UUID_ROOT / ext4 auto,noatime 0 0' >> $CHROOT/etc/fstab"
 
+# It should install GRUB
+sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true PATH=/bin:/usr/bin:/sbin:/usr/sbin apt-get -y install initramfs grub2  
+
 # It should clean up apt
 sudo chroot "$CHROOT" apt-get clean
 
 # It should set root in new image
 echo "CAUTION! We're about to set root password. Please remember what you set :)"
 sudo chroot $CHROOT passwd
-
-# It should allow remote root access
-sudo sed -i -r "s/^PermitRootLogin without-password/PermitRootLogin yes/" $CHROOT/etc/ssh/sshd_config
-
-# It should kill services starting by the chroot install
-sudo killall mdadm openssh-server
 
 # It should unmount
 for i in proc sys dev ; do sudo umount "$CHROOT/$i" ; done
