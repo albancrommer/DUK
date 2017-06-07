@@ -101,7 +101,7 @@ sudo bash -c "echo 'UUID=$UUID_BOOT /boot ext2 defaults 0 2' >> $CHROOT/etc/fsta
 sudo bash -c "echo 'UUID=$UUID_ROOT / ext4 errors=remount-ro 0 1' >> $CHROOT/etc/fstab"
 
 # It should mount dev sys proc in the chroot
-for i in proc sys dev ; do sudo mount /$i "$CHROOT"/$i --bind ; done
+for i in proc sys dev ; do sudo mount --rbind /$i "$CHROOT"/$i  ; done
 
 
 # It should run update grub in the chroot
@@ -116,8 +116,9 @@ sudo bash -c "echo '(hd0) $USB_DISK' > $CHROOT/boot/grub/device.map"
 # It should install grub on the USB KEY
 sudo chroot $CHROOT grub-install "$USB_DISK"
 
+exit
 # It should unmount
-for i in proc sys dev ; do sudo umount "$CHROOT/$i" ; done
+for i in proc sys dev ; do sudo umount -R "$CHROOT/$i" ; done
 sudo umount "$CHROOT"/boot
 sudo umount "$CHROOT"
 
