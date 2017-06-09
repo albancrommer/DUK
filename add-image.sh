@@ -1,16 +1,21 @@
 #!/bin/bash
+LOG_FILE=$(mktemp)
+exec &> >(tee -a "$LOG_FILE")
+
+# It should set a bunch of variables
+APP_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+CHROOT=$(mktemp -d)
+
+# It should load a bunch of functions
+source "$APP_PATH/functions.sh"
 
 # It should require sudo 
 if ! which sudo &>/dev/null ; then 
-	echo "You must install sudo."
-	exit 1
+	panic "You must install sudo."
 fi
 
 # It should require debootstrap
 if ! which debootstrap &>/dev/null ; then 
-	read -n 1 -p "Debootstrap is required. Agree to install it? [Y/n]: "
-	REPLY=${REPLY:-Y}
-	[ ${REPLY^^} = "N" ] && exit
 	sudo apt-get install debootstrap
 fi
 
@@ -19,31 +24,63 @@ fi
 
 # It should deploy a Jessie by default
 SUITE=${SUITE:-jessie}
-[ ! -f "/usr/share/debootstrap/scripts/$SUITE" ] && { echo "Invalid suite requested: $SUITE"; exit 1; }
+[ ! -f "/usr/share/debootstrap/scripts/$SUITE" ] && panic "Invalid suite requested: $SUITE"
+
+# It should welcome the user 
+info "<b>Hi and welcome to the Debian USB KEY Installer.</b>\n
+Before installing the system, we will need to know more about the image you intend to create.
+First we'll ask you for a name: please don't use spaces!
+Then we'll need to know how big the non system partition, i.e. the standard usb key part will be."
 
 # It should require an image name
-read -p "Please give a name to your key (default is usbkey): " NAME
+NAME=$( input "Please give a name to your key (default is usbkey) " usbkey )
 NAME=${NAME:-usbkey}
 
-# It should set a bunch of variables
-APP_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+# It should set the image name
 IMAGE="${APP_PATH}/${NAME}.img"
-CHROOT=$(mktemp -d)
 
 # It should escape if the image already exists 
-[ -f "$IMAGE" ] && { echo "The image '$IMAGE' already exists. Exiting"; exit 1; }
+[ -f "$IMAGE" ] && panic "The image '$IMAGE' already exists. Exiting"; 
+
+# It should ask if the user wants more than 4Gb for the "usbstick" partition
+if (question "Would you like to use more than 4Go for the Win/Mac partition?" ) then
+    info "
+<b>The game is to leave 4 Go FREE for the system on the total USB size.</b>\n
+The 'USB stick' partition that will be readable on any non Linux system must account for these 4Go.\n 
+For each standard USB key size, the correct USB stick size would then be TOTAL minus 4 Go, i.e.  \n
+	 8 Go:   4\n
+    16 Go:  12\n
+    32 Go:  28\n
+    64 Go:  60\n
+   128 Go: 124\n
+      "
+    VFAT_GO=$(zenity --scale --text="Please provide the size in Go" --min-value="2" --max-value="252" --step="2"  --value=4)
+    
+    # Requested size should be an int > 1
+    VFAT_CHECK=$(( $VFAT_GO + 1 )) &>/dev/null
+    if [[ $? -ne 0 || $VFAT_CHECK -lt 2 ]]; then
+		panic "Invalid value '$VFAT_GO'"
+	fi
+    
+else 
+	VFAT_GO=4
+fi
+
+VFAT_SECTOR_SIZE=$(( $VFAT_GO * 1024 * 1024 * 1024 / 512 ))
+BOOT_SECTOR_START=$(( $VFAT_SECTOR_SIZE + 2048 ))
+ROOT_SECTOR_START=$(( $BOOT_SECTOR_START + 409600 ))
 
 # It should make a file image sparse  ie. seen as 4G but 0 blocks used at start
-truncate -s 8G "$IMAGE"
+truncate -s $(( $VFAT_GO + 4 ))G "$IMAGE"
 
 # It should partition the image with 2 partitions
 echo "
 # partition table of usbkey.img
 unit: sectors
 
-usbkey.img1 : start=     2048, size=  8388608, Id= b
-usbkey.img2 : start=  8390656, size=   409600, Id=83, bootable
-usbkey.img3 : start=  8800256, size=  7976960, Id=83
+usbkey.img1 : start=     2048, size=  $VFAT_SECTOR_SIZE, Id= b
+usbkey.img2 : start=  $BOOT_SECTOR_START, size=   409600, Id=83, bootable
+usbkey.img3 : start=  $ROOT_SECTOR_START, size=  7976960, Id=83
 usbkey.img4 : start=        0, size=        0, Id= 0
 "|sfdisk -f $IMAGE
 
@@ -55,8 +92,7 @@ PART_ROOT="${LOOP_DEVICE}p3"
 
 # It should fail if partitions not mounted
 if [ ! -e $PART_ROOT ] || [ ! -e $PART_BOOT ] ; then 
-	echo "Failed to mount the local loop partitions. Exiting."
-	exit 1
+	panic "Failed to mount the local loop partitions. Exiting."
 fi
 
 # It should make file systems for 2 partitions
@@ -78,22 +114,23 @@ sudo debootstrap $SUITE "$CHROOT"
 sudo mount "$PART_BOOT" "$CHROOT"/boot
 
 # It should mount proc sys dev for the chroot
-for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --bind ; done
+for i in proc sys dev ; do sudo mount /$i "${CHROOT}/$i" --rbind ; done
 
 # It should force the jessie backport
 sudo bash -c "echo 'deb http://httpredir.debian.org/debian jessie-backports main contrib non-free' >> $CHROOT/etc/apt/sources.list"
 
 # It should install the right kernel 
-read -p "Would you like to a recent  Linux Kernel (4.9) for Jessie ? [Y/n]" REPLY
-REPLY=${REPLY:-Y}
-if [ "${REPLY^^}" != "N" ] ; then 
-		LINUX_IMAGE=" -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 "
+if (question "Would you like to install a recent Linux Kernel (4.9/Jessie backports)?") ; then
+	LINUX_IMAGE=" -t jessie-backports linux-image-4.9.0-0.bpo.2-amd64 "
 else 
 	LINUX_IMAGE=" linux-image-amd64 "
 fi
 
 # It should run an apt udate
 sudo chroot $CHROOT apt-get update
+
+# It should warn about dialogs
+info "The package installation is about to begin.\n\n<b>Some dialogs are going to require your attention on the terminal.</b>\nYou will have to select the languages you want installed. For french, as an example, you must choose 'fr_FR.utf8'"
 
 # It should install some basic packages 
 sudo chroot $CHROOT apt-get -y install $LINUX_IMAGE locales aptitude linux-base firmware-linux-free firmware-linux-nonfree
@@ -102,10 +139,7 @@ sudo chroot $CHROOT apt-get -y install $LINUX_IMAGE locales aptitude linux-base 
 sudo chroot $CHROOT dpkg-reconfigure locales 
 
 
-read -p "Would you like to install system admin packages? [Y/n]" REPLY
-REPLY=${REPLY:-Y}
-if [ "${REPLY^^}" != "N" ] ; then 
-
+if( question  "Would you like to install system admin packages?" ); then 
 	# It should install packages necessary to adminsys
 	sudo chroot $CHROOT apt-get -y install console-data keyboard-configuration console-setup-linux cryptsetup mdadm lvm2 vim-nox emacs-nox mtr-tiny tcpdump strace ltrace openssl bridge-utils vlan screen rsync openssh-server smartmontools debootstrap debsums sudo 
 
@@ -116,13 +150,9 @@ if [ "${REPLY^^}" != "N" ] ; then
 	pgrep mdadm &>/dev/null && sudo killall mdadm
 	pgrep sshd &>/dev/null && sudo killall sshd
 
-
-
 fi
 
-read -p "Would you like to run desktop, server, laptop package installs? [Y/n] " REPLY
-REPLY=${REPLY:-Y}
-if [ "${REPLY^^}" != "N" ] ; then 
+if (question  "Would you like to run desktop, server, laptop package installs?"); then
 
 	# It should run tasksel in the image
 	sudo chroot $CHROOT apt-get -y install tasksel
@@ -155,17 +185,24 @@ sudo chroot $CHROOT env -i DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE
 sudo chroot "$CHROOT" apt-get clean
 
 # It should set root in new image
-echo "CAUTION! We're about to set root password. Please remember what you set :)"
-sudo chroot $CHROOT passwd
+info "<b>CAUTION</b>\nNow the system is installed. You have to set the ROOT user password for it."
+PASSWD=$(password "Root user's password");
+sudo chroot $CHROOT bash -c "echo 'root:$PASSWD' | chpasswd"
+echo $PASSWD > "$IMAGE.pass"
+info "The password will be stored in clear into the file $IMAGE.pass"
+
 
 # It should unmount
-for i in proc sys dev ; do sudo umount "$CHROOT/$i" ; done
+for i in proc sys dev ; do sudo umount -R "$CHROOT/$i" ; done
 sudo umount "$CHROOT"/boot
-sudo umount "$CHROOT"
+sudo umount -R "$CHROOT"
 
+rm -f $TMP_FILE
 
 # Finish !
-echo "OK. finished. Now you can run burn-usb.sh!"
+if( question  "OK, finished the $SUITE image. Do you want to burn an USB Key now?"); then 
+	$APP_PATH/burn-usb.sh $IMAGE
+fi
  
 
 
