@@ -14,6 +14,16 @@ if ! which sudo &>/dev/null ; then
 	panic "You must install sudo."
 fi
 
+# It should require zenity 
+if ! which zenity &>/dev/null ; then 
+	sudo apt-get install zenity
+fi
+
+# It should require dosfstools 
+if ! which mkfs.vfat &>/dev/null ; then 
+	sudo apt-get install dosfstools
+fi
+
 # It should require debootstrap
 if ! which debootstrap &>/dev/null ; then 
 	sudo apt-get install debootstrap
