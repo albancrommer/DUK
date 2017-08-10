@@ -87,7 +87,7 @@ case ${#IMAGE_LIST[@]} in
 	;;
 esac
 IMAGE="${APP_PATH}/$IMAGE"
-[ -f "$IMAGE"] && panic "Invalid image $IMAGE requested"
+[ ! -f "$IMAGE" ] && panic "Invalid image $IMAGE requested"
 
 # It should print the command and validate
 if( ! question "Please validate the following informations: 
